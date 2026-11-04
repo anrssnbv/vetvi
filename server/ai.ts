@@ -114,6 +114,12 @@ export function createBridge(config: BridgeConfig, service: TaskService) {
               422: ["VALIDATION", "Проверьте данные запроса."],
               429: ["RATE_LIMIT", "Слишком много запросов. Повторите позже."],
             };
+            let detail: unknown;
+            try { detail = JSON.parse(Buffer.concat(chunks).toString("utf8")).detail; } catch { /* Keep unknown errors generic. */ }
+            if (status === 409 && detail === "vetvi_task_inactive") {
+              reject(new ServiceError("TASK_INACTIVE", "Задача завершена, отменена или убрана в архив. Для новых сообщений и файлов верните её в работу.", 409));
+              return;
+            }
             const error = errors[status];
             reject(error ? new ServiceError(error[0], error[1], status) : unavailable());
             return;

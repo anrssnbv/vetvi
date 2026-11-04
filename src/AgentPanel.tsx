@@ -84,6 +84,7 @@ type Props = {
     projectId: string;
     version: number;
     title: string;
+    status: string;
   };
   onClose: () => void;
   onTaskChanged: () => void;
@@ -111,6 +112,8 @@ const prompts: {
 const items = <T,>(value: T[] | undefined): T[] => Array.isArray(value) ? value : [];
 export function AgentPanel({ task, onClose, onTaskChanged }: Props) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  const taskClosed = task.status === "done" || task.status === "cancelled";
+  const canExecute = !taskClosed && conversation?.can_execute !== false;
   const [sources, setSources] = useState<{
     id: string;
     title: string;
@@ -147,7 +150,7 @@ export function AgentPanel({ task, onClose, onTaskChanged }: Props) {
       setMessage("");
       setComment("");
     }
-    setError(errors[status] ?? "Не удалось подтвердить результат запроса. Обновите диалог. Повтор отправки использует тот же запрос, пока вы не измените текст или источники.");
+    setError((failure instanceof Error && "code" in failure && failure.code === "TASK_INACTIVE" ? "Задача завершена, отменена или убрана в архив. Для новых сообщений и файлов верните её в работу." : undefined) ?? errors[status] ?? "Не удалось подтвердить результат запроса. Обновите диалог. Повтор отправки использует тот же запрос, пока вы не измените текст или источники.");
   }, []);
   const api = useCallback(async <T,>(path: string, method = "GET", body?: unknown, key?: string, version?: number): Promise<T> => {
     if (stopped.current)
@@ -160,8 +163,10 @@ export function AgentPanel({ task, onClose, onTaskChanged }: Props) {
         headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(key ? { "Idempotency-Key": key } : {}), ...(version === undefined ? {} : { "If-Match": `"${version}"` }) },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
-      if (!response.ok)
-        throw Object.assign(new Error(), { status: response.status });
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        throw Object.assign(new Error(), { status: response.status, code: failure.code });
+      }
       return response.status === 204 ? undefined as T : await response.json() as T;
     }
     finally {
@@ -393,34 +398,35 @@ export function AgentPanel({ task, onClose, onTaskChanged }: Props) {
         () => setNotice(allowed ? "Разрешение сохранено для текущей версии задачи." : "Разрешение на автоматическое завершение отозвано."));
     }}/>Разрешаю PM технически завершить эту версию задачи после принятия точного документа Word уполномоченным руководителем и всех проверок.</label>
      </section>
-     <form className="agent-compose" onSubmit={(event) => { event.preventDefault(); if (!message.trim())
+     <form className="agent-compose" onSubmit={(event) => { event.preventDefault(); if (!canExecute || !message.trim())
       return; void perform("turn", `/conversations/${encodeURIComponent(conversation.id)}/turns`, { message: message.trim(), kind, source_version_ids: sourceIds, knowledge_entry_ids: [] }, task.version, () => { setMessage(""); setNotice("Поручение сохранено. Ожидаем состояние исполнителя."); }); }}>
       <h3>Новое поручение</h3>
+    {taskClosed && <p role="status">Задача {task.status === "done" ? "завершена" : "отменена"}. Для новых сообщений и файлов закройте чат и нажмите «Открыть повторно» в карточке задачи. История остаётся доступной.</p>}
     {conversation.can_execute === false && <p>Доступен просмотр и принятие документа. Запуск помощника требует права выполнения.</p>}
-    <div className="agent-prompts">{prompts.map((prompt) => <button type="button" key={prompt.label} disabled={busy} onClick={() => { setKind(prompt.kind); setMessage(prompt.label); pending.current.delete("turn"); }}>{prompt.label}</button>)}</div>
-      <label>Формат результата<select value={kind} disabled={busy} onChange={(event) => { setKind(event.target.value as Kind); pending.current.delete("turn"); }}>
+    <div className="agent-prompts">{prompts.map((prompt) => <button type="button" key={prompt.label} disabled={busy || !canExecute} onClick={() => { setKind(prompt.kind); setMessage(prompt.label); pending.current.delete("turn"); }}>{prompt.label}</button>)}</div>
+      <label>Формат результата<select value={kind} disabled={busy || !canExecute} onChange={(event) => { setKind(event.target.value as Kind); pending.current.delete("turn"); }}>
     <option value="assistance">Помощь по задаче</option>
     <option value="memo">Служебная записка</option>
     <option value="briefing">Справка</option>
     <option value="report">Отчёт</option>
     </select>
     </label>
-      <label>Источники — до 8 версий<select multiple value={sourceIds} disabled={busy || !sources.length} size={Math.min(5, Math.max(2, sources.length))} onChange={(event) => { const selected = Array.from(event.target.selectedOptions, (option) => option.value); if (selected.length > 8) {
+      <label>Источники — до 8 версий<select multiple value={sourceIds} disabled={busy || !canExecute || !sources.length} size={Math.min(5, Math.max(2, sources.length))} onChange={(event) => { const selected = Array.from(event.target.selectedOptions, (option) => option.value); if (selected.length > 8) {
       setError("Выберите не более 8 источников.");
       return;
     } setSourceIds(selected); pending.current.delete("turn"); }}>{sources.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}</select>
     </label>
       {!sources.length && <p className="agent-note">Доступных источников пока нет. Помощник должен запросить недостающие сведения.</p>}
-      <label>Сообщение помощнику<textarea value={message} maxLength={1000} rows={5} disabled={busy} onChange={(event) => { setMessage(event.target.value); pending.current.delete("turn"); }} placeholder="Опишите результат, критерии и недостающие данные"/>
+      <label>Сообщение помощнику<textarea value={message} maxLength={1000} rows={5} disabled={busy || !canExecute} onChange={(event) => { setMessage(event.target.value); pending.current.delete("turn"); }} placeholder="Опишите результат, критерии и недостающие данные"/>
     </label>
       <p className="agent-note">Отправка поручения и явное продолжение могут использовать модель. Опрос состояния выполняется без нового запуска.</p>
       <div className="agent-actions">
-    <button type="submit" className="agent-primary" disabled={busy || !message.trim() || stopped.current || conversation.can_execute === false}>{busy ? "Сохраняем…" : "Отправить поручение"}</button>
+    <button type="submit" className="agent-primary" disabled={busy || !message.trim() || stopped.current || !canExecute}>{busy ? "Сохраняем…" : "Отправить поручение"}</button>
     <button type="button" disabled={busy || stopped.current} onClick={() => { void reload.current().catch(report); }}>Обновить диалог</button>
        {latest && controlsReady && !["completed", "cancelled"].includes(latest.state || "") && <button type="button" disabled={busy} onClick={() => control("cancel")}>Остановить выполнение</button>}
-       {latest?.state === "waiting_for_input" && controlsReady && <button type="button" disabled={busy || !message.trim()} onClick={() => control("answer")}>Ответить на уточнение</button>}
+       {latest?.state === "waiting_for_input" && controlsReady && <button type="button" disabled={busy || !canExecute || !message.trim()} onClick={() => control("answer")}>Ответить на уточнение</button>}
        {latest?.state === "waiting_for_review" && controlsReady && <button type="button" disabled={busy || !latestResult || !(latest.step_id || latest.step?.id)} onClick={() => control("resume")}>Продолжить после принятия</button>}
-       {latest && ["failed", "blocked"].includes(latest.state || "") && controlsReady && <button type="button" disabled={busy} onClick={() => control("retry")}>Повторить выполнение</button>}
+       {latest && ["failed", "blocked"].includes(latest.state || "") && controlsReady && <button type="button" disabled={busy || !canExecute} onClick={() => control("retry")}>Повторить выполнение</button>}
       </div>
       {turns.some((turn) => items(turn.results).some((result) => items(result.reviews).some((review) => review.can_decide === true || review.eligible === true))) && <label>Комментарий руководителя<textarea value={comment} maxLength={4000} rows={3} onChange={(event) => setComment(event.target.value)} disabled={busy}/>
       <span className="agent-note">Для возврата на доработку укажите замечания.</span>

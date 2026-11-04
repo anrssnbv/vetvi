@@ -40,6 +40,7 @@ async function fixture() {
     const body = raw ? JSON.parse(raw) : undefined;
     seen.push({ path: req.url!, headers: req.headers, body });
     res.setHeader("Content-Type", "application/json");
+    if (mode === "inactive") { res.statusCode = 409; res.end(JSON.stringify({ detail: "vetvi_task_inactive" })); return; }
     if (mode === "oversize") { res.end(JSON.stringify({ content: "x".repeat(2 * 1024 * 1024) })); return; }
     if (mode === "redirect") { res.writeHead(302, { Location: "https://example.invalid/secret" }); res.end(); return; }
     if (mode === "malformed") { res.end("invalid JSON"); return; }
@@ -180,5 +181,17 @@ test("bridge transport rejects redirects, oversized/malformed responses, forward
     assert.throws(() => createBridge({ ...f.config, keyFile: linked }, service));
     writeFileSync(f.keyFile, "short");
     assert.throws(() => createBridge(f.config, service));
+  } finally { service.close(); await f.close(); }
+});
+
+
+test("closed-task conflicts explain the required task action", async () => {
+  const f = await fixture();
+  const service = new TaskService(":memory:");
+  try {
+    f.setMode("inactive");
+    await assert.rejects(createBridge(f.config, service).call("POST", "/conversations/test/turns", {}),
+      (error: unknown) => error instanceof ServiceError && error.status === 409 &&
+        error.code === "TASK_INACTIVE" && error.message.includes("верните её в работу"));
   } finally { service.close(); await f.close(); }
 });
