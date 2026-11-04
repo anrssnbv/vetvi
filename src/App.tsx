@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newRequestId } from "./request-id";
 import { isOverdue as overdue, localDate as today, sectionProjects, sectionTasks, sidebarGroups, type StorageView } from "./task-view";
-import { AgentPanel } from "./AgentPanel";
+import { ChatWindow } from "./ChatWindow";
 import {
   ReactFlow,
   Background,
@@ -1361,7 +1361,7 @@ export default function App() {
           {notice}
         </div>
       )}
-      {agentOpen && selected && <AgentPanel key={`${selected.projectId}:${selected.id}`} task={selected} onClose={() => setAgentOpen(false)} onTaskChanged={() => { void run(async () => { await refresh(); const current = selectedRef.current; if (current) setSelected(await api<Task>("get_task", { id: current.id })); }); }} />}
+      {agentOpen && selected && <ChatWindow onClose={() => setAgentOpen(false)} />}
       {create && (
         <Modal
           title={create.parentId ? "Новая подзадача" : "Новая задача"}

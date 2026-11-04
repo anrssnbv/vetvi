@@ -86,3 +86,7 @@ npm audit
 ## Устройство проекта
 
 `src/` — React и React Flow. `server/service.ts` — транзакционные правила. `server/schema.ts` и `migrations/` — база. `server/index.ts` — HTTP API, `server/mcp.ts` — общие MCP-инструменты, `server/stdio.ts` — локальный MCP. `server/auth.ts` — сессии, OAuth и проверка доступа. `server/backup.ts` — проверяемое резервное копирование. `tasks/github-publication.md` — подготовка публичного репозитория. Локальная спецификация `tasks/todo.md` исключена из Git, поскольку содержит сведения рабочего экземпляра.
+
+## Independent chat window
+
+The task chat button opens the existing `/chat/` page in a responsive modal, with a separate-tab link. SK AI Chat keeps its own sign-in, private history and attachments. Task data and the old agent conversations are not transferred automatically. The chat host must allow same-origin framing; unrelated origins stay blocked.
