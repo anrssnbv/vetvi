@@ -788,8 +788,8 @@ export default function App() {
               </button>
               <div id={`project-category-${group.id}`} hidden={collapsedCategories.has(group.id)}>
               {group.project ? (
-                matchingTasks.some(task => task.projectId === group.project?.id) ?
-                  matchingTasks.filter(task => task.projectId === group.project?.id).map(task => (
+                matchingTasks.some(task => task.projectId === group.project?.id && !task.parentId) ?
+                  matchingTasks.filter(task => task.projectId === group.project?.id && !task.parentId).map(task => (
                     <button
                       type="button"
                       key={task.id}
