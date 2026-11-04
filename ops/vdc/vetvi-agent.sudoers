@@ -1,0 +1,5 @@
+# Run application operations as vetvi; privileged commands match these exact arguments.
+admin-srv ALL=(vetvi) NOPASSWD: ALL
+admin-srv ALL=(root) NOPASSWD: /usr/bin/systemctl start vetvi.service vetvi-tunnel.service
+admin-srv ALL=(root) NOPASSWD: /usr/bin/systemctl stop vetvi.service vetvi-tunnel.service
+admin-srv ALL=(root) NOPASSWD: /usr/bin/systemctl restart vetvi.service vetvi-tunnel.service

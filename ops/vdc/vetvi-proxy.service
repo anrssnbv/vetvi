@@ -1,0 +1,14 @@
+[Unit]
+Description=Forward shared Nginx requests to Vetvi loopback
+Requires=vetvi.service vetvi-proxy.socket
+After=vetvi.service vetvi-proxy.socket
+
+[Service]
+Type=notify
+User=vetvi
+Group=vetvi
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd 127.0.0.1:3001
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true

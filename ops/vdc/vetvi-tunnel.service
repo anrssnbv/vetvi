@@ -1,0 +1,26 @@
+[Unit]
+Description=Vetvi Secure MCP Tunnel
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=vetvi
+Group=vetvi
+WorkingDirectory=/opt/vetvi
+Environment=PATH=/opt/node24/bin:/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/var/lib/vetvi
+EnvironmentFile=/etc/vetvi/app.env
+EnvironmentFile=/etc/vetvi/tunnel.env
+ExecStartPre=/usr/local/bin/tunnel-client doctor --profile vetvi-vdc --profile-dir /var/lib/vetvi/tunnel-profile --explain
+ExecStart=/usr/local/bin/tunnel-client run --profile vetvi-vdc --profile-dir /var/lib/vetvi/tunnel-profile
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vetvi
+
+[Install]
+WantedBy=multi-user.target

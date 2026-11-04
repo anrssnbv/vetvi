@@ -1,0 +1,2 @@
+CREATE TABLE task_transfers(task_id TEXT NOT NULL,from_project TEXT NOT NULL,to_project TEXT NOT NULL,from_namespace TEXT NOT NULL,to_namespace TEXT NOT NULL,actor_id TEXT NOT NULL,request_id TEXT NOT NULL,PRIMARY KEY(task_id,request_id));
+CREATE TABLE transfer_receipts(actor_id TEXT NOT NULL,request_id TEXT NOT NULL,fingerprint TEXT NOT NULL,response TEXT NOT NULL,PRIMARY KEY(actor_id,request_id));

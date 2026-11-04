@@ -1,0 +1,17 @@
+[Unit]
+Description=Vetvi checked SQLite backup
+
+[Service]
+Type=oneshot
+User=vetvi
+Group=vetvi
+WorkingDirectory=/var/lib/vetvi
+Environment=DATABASE_PATH=/var/lib/vetvi/data/tasks.sqlite
+ExecStart=/opt/node24/bin/node --import /opt/vetvi/node_modules/tsx/dist/loader.mjs /opt/vetvi/server/backup.ts
+ExecStartPost=/usr/bin/python3 -c "from pathlib import Path; copies = sorted(Path('/var/lib/vetvi/backups').glob('tasks-*.sqlite'), key=lambda p: p.stat().st_mtime); [p.unlink() for p in copies[:-14]]"
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vetvi
