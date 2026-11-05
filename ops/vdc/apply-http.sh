@@ -78,14 +78,14 @@ runuser -u vetvi -- tar -xzf - -C /opt/vetvi --no-same-owner < "$VDC_ASSETS/http
 grep -q '^PUBLIC_BASE_URL=' /etc/vetvi/app.env
 grep -q '^UI_ORIGIN=' /etc/vetvi/app.env
 sed -i \
-  -e 's@^PUBLIC_BASE_URL=.*@PUBLIC_BASE_URL=http://92.46.191.252/vetvi/@' \
+  -e 's@^PUBLIC_BASE_URL=.*@PUBLIC_BASE_URL=http://92.46.191.252/space/@' \
   -e 's@^UI_ORIGIN=.*@UI_ORIGIN=http://92.46.191.252@' \
   -e '/^ALLOW_INSECURE_HTTP=/d' /etc/vetvi/app.env
 printf '\nALLOW_INSECURE_HTTP=true\n' >> /etc/vetvi/app.env
 chown root:vetvi /etc/vetvi/app.env
 chmod 640 /etc/vetvi/app.env
 runuser -u vetvi -- env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm test
-runuser -u vetvi -- env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/vetvi/
+runuser -u vetvi -- env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/space/
 for name in vetvi-proxy.socket vetvi-proxy.service; do
   install -o root -g root -m 644 "$VDC_WORKSPACE/ops/vdc/$name" "/etc/systemd/system/$name"
 done
@@ -103,10 +103,10 @@ VDC_CONTAINER=$(docker ps -q --filter label=com.docker.compose.project=sk-ai-pub
 test "$(docker inspect --format '{{.Image}}' "$VDC_CONTAINER")" = "$(cat "$VDC_BACKUP/nginx-image")"
 docker ps --filter label=com.docker.compose.project=sk-ai-public-http --format '{{.Label "com.docker.compose.service"}} {{.ID}}' | awk '$1 != "nginx"' | LC_ALL=C sort | cmp - "$VDC_BACKUP/backends-before.txt"
 VDC_PHASE=http-acceptance
-python3 "$VDC_WORKSPACE/ops/vdc/verify-http.py" http://92.46.191.252/vetvi/ /etc/vetvi/app.env
+python3 "$VDC_WORKSPACE/ops/vdc/verify-http.py" http://92.46.191.252/space/ /etc/vetvi/app.env
 curl -fsS http://127.0.0.1:3002/readyz
 systemctl is-active vetvi vetvi-tunnel vetvi-proxy.socket
-printf 'HTTP применён: http://92.46.191.252/vetvi/\nКаталог отката: %s\n' "$VDC_BACKUP"
+printf 'HTTP применён: http://92.46.191.252/space/\nКаталог отката: %s\n' "$VDC_BACKUP"
 trap - ERR
 if ! systemctl is-enabled --quiet vetvi-backup.timer; then
   if [[ ! -e /etc/systemd/system/vetvi-backup.service && ! -e /etc/systemd/system/vetvi-backup.timer ]]; then

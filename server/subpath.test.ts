@@ -31,7 +31,7 @@ test("public HTTP needs an explicit UI opt-in and never relaxes OAuth URLs", () 
   const config = {
     password: "synthetic-owner-password",
     owner: "owner",
-    baseUrl: "http://92.46.191.252/vetvi/",
+    baseUrl: "http://92.46.191.252/space/",
   };
   assert.throws(() => createAuth(config), /HTTPS required/);
   assert.doesNotThrow(() => createAuth({ ...config, allowInsecureHttp: true }));
@@ -46,7 +46,7 @@ test("public HTTP needs an explicit UI opt-in and never relaxes OAuth URLs", () 
       ...config,
       allowInsecureHttp: true,
       oauthIssuer: "https://identity.example.com/",
-      oauthAudience: "http://92.46.191.252/vetvi/mcp",
+      oauthAudience: "http://92.46.191.252/space/mcp",
       oauthJwksUrl: "https://identity.example.com/jwks",
     }),
     /OAuth MCP requires HTTPS/,
@@ -54,10 +54,10 @@ test("public HTTP needs an explicit UI opt-in and never relaxes OAuth URLs", () 
   assert.throws(
     () => createAuth({
       ...config,
-      baseUrl: "https://92.46.191.252/vetvi/",
+      baseUrl: "https://92.46.191.252/space/",
       allowInsecureHttp: true,
       oauthIssuer: "http://identity.example.com/",
-      oauthAudience: "https://92.46.191.252/vetvi/mcp",
+      oauthAudience: "https://92.46.191.252/space/mcp",
       oauthJwksUrl: "https://identity.example.com/jwks",
     }),
     /HTTPS required/,
@@ -71,7 +71,7 @@ test("a stripped proxy prefix preserves API auth, cookie scope and public metada
     login: "admin",
     password: "synthetic-owner-password",
     owner: "owner",
-    baseUrl: `${origin}/vetvi/`,
+    baseUrl: `${origin}/space/`,
     uiOrigin: origin,
     allowInsecureHttp: true,
     databasePath: join(directory, "tasks.sqlite"),
@@ -101,7 +101,7 @@ test("a stripped proxy prefix preserves API auth, cookie scope and public metada
     assert.equal(login.status, 200);
     const setCookie = login.headers.get("set-cookie")!;
     assert.match(setCookie, /^task_session=/);
-    assert.match(setCookie, /Path=\/vetvi;/);
+    assert.match(setCookie, /Path=\/space;/);
     assert.match(setCookie, /HttpOnly/);
     assert.match(setCookie, /SameSite=Strict/);
     assert(!setCookie.includes("Secure"));
@@ -112,15 +112,15 @@ test("a stripped proxy prefix preserves API auth, cookie scope and public metada
     assert.equal(projects.status, 200);
     assert.equal((await projects.json()).total, 1);
     const metadata = await (await send(`${upstream}/.well-known/oauth-protected-resource/mcp`, { headers })).json();
-    assert.equal(metadata.resource, `${origin}/vetvi/mcp`);
+    assert.equal(metadata.resource, `${origin}/space/mcp`);
     const mcp = await send(`${upstream}/mcp`, { method: "POST", headers, body: "{}" });
     assert.equal(mcp.status, 401);
-    assert(mcp.headers.get("www-authenticate")!.includes(`${origin}/vetvi/.well-known/oauth-protected-resource/mcp`));
+    assert(mcp.headers.get("www-authenticate")!.includes(`${origin}/space/.well-known/oauth-protected-resource/mcp`));
     const logout = await send(`${upstream}/api/logout`, {
       method: "POST", headers: { ...headers, Cookie: cookie },
     });
     assert.equal(logout.status, 200);
-    assert.match(logout.headers.get("set-cookie")!, /Path=\/vetvi;/);
+    assert.match(logout.headers.get("set-cookie")!, /Path=\/space;/);
     assert.equal((await (await send(`${upstream}/api/session`, { headers: { ...headers, Cookie: cookie } })).json()).authenticated, false);
   } finally {
     server.closeAllConnections();

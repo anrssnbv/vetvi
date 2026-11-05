@@ -1,6 +1,6 @@
-# space
+# Space
 
-Для общего HTTP-входа на этом VDC: [адрес `/vetvi/`, API, Nginx и применение](docs/public-http.md). Это явно выбранный владельцем режим HTTP на порту 80; схема через SSH ниже сохраняется для отдельного закрытого запуска.
+Для общего HTTP-входа на этом VDC: [адрес `/space/`, API, Nginx и применение](docs/public-http.md). Это явно выбранный владельцем режим HTTP на порту 80; схема через SSH ниже сохраняется для отдельного закрытого запуска.
 
 Личное пространство задач: интерактивный граф, список и карточка над одной SQLite-базой. Интерфейс на русском. Нет биллинга, тарифов, подписок, пробных периодов или платных функций. Данные демонстрационного проекта синтетические и не подтверждают реальные рабочие статусы.
 
@@ -95,4 +95,4 @@ The task chat button opens the existing `/chat/` page in a responsive modal, wit
 
 Tasks and subtasks show one responsible person and a list of co-executors. Assignment changes require both project-management and task-write permissions; ordinary participants can read assignments and update task progress. The progress field retains the existing description and project visibility rules. Bulk imports also require management permissions because they can replace assignments.
 
-The product is named `space`; `/vetvi/`, existing integration identifiers and data locations remain compatible.
+The product is named `Space`. The public URL/API prefix is `/space/`; old `/vetvi/` links redirect. Existing integration identifiers and data locations remain compatible.

@@ -41,7 +41,7 @@ as_vetvi ln -s /opt/vetvi/node_modules "$VDC_STAGE/node_modules"
 tar -czf - -C "$VDC_WORKSPACE" "${VDC_FILES[@]}" | as_vetvi tar -xzf - --no-same-owner -C "$VDC_STAGE"
 as_vetvi /bin/bash -c 'cd "$1" && sha256sum -c -' bash "$VDC_STAGE" < "$VDC_ASSETS/project-delete-release.sha256"
 VDC_PHASE=stage-tests-and-build
-as_vetvi /bin/bash -c 'cd "$1" && PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm test && PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/vetvi/' bash "$VDC_STAGE"
+as_vetvi /bin/bash -c 'cd "$1" && PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm test && PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/space/' bash "$VDC_STAGE"
 VDC_PHASE=backup
 as_vetvi sha256sum -c - < "$VDC_ASSETS/project-delete-original.sha256"
 as_vetvi tar -czf - "${VDC_FILES[@]}" dist > "$VDC_BACKUP/code.tar.gz"
@@ -57,7 +57,7 @@ as_vetvi install -m 600 "$VDC_STAGE/dist/index.html" dist/index.next
 as_vetvi mv -- dist/index.next dist/index.html
 services start
 VDC_PHASE=health
-curl -fsS --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 http://92.46.191.252/vetvi/health
+curl -fsS --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 http://92.46.191.252/space/health
 curl -fsS --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 http://127.0.0.1:3002/readyz
 systemctl is-active vetvi vetvi-tunnel
 VDC_CHANGED=false

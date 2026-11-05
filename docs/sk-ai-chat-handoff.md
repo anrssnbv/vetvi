@@ -1,6 +1,6 @@
-# space → SK AI Chat handoff
+# Space → SK AI Chat handoff
 
-The owner requests one persistent chat per task, including one separate chat for every subtask, grouped under the task's owning project. SK AI Chat projects and the receiving handler are being implemented independently. This delivery configures the space sender only.
+The owner requests one persistent chat per task, including one separate chat for every subtask, grouped under the task's owning project. SK AI Chat projects and the receiving handler are being implemented independently. This delivery configures the Space sender only.
 
 ## URL contract
 
@@ -19,7 +19,7 @@ Encode/decode fields with `URLSearchParams`. Cyrillic, spaces, `&`, `+`, `#` and
 | `vetvi_task_id` | Stable ID of the selected task itself. A subtask sends its own ID, never its parent's. |
 | `vetvi_task_name` | Current task/subtask display title. |
 
-No description, result, attachment, existing message, API key or session token is included. space and chat authentication remain independent.
+No description, result, attachment, existing message, API key or session token is included. Space and chat authentication remain independent.
 
 ## Receiving behavior to implement in SK AI Chat
 
@@ -33,4 +33,4 @@ The sender does not establish shared project ACLs, account federation, synchroni
 
 ## Verification boundary
 
-space tests cover URL encoding, identical reopen targets, rename-stable IDs, different task/subtask IDs and current owning-project selection. Browser acceptance checks both iframe and standalone URLs. Project/chat creation, ownership isolation and old-history reuse require the receiving implementation and separate end-to-end acceptance; a correct sender URL is not proof of those behaviors.
+Space tests cover URL encoding, identical reopen targets, rename-stable IDs, different task/subtask IDs and current owning-project selection. Browser acceptance checks both iframe and standalone URLs. Project/chat creation, ownership isolation and old-history reuse require the receiving implementation and separate end-to-end acceptance; a correct sender URL is not proof of those behaviors.

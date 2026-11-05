@@ -51,14 +51,14 @@ as_vetvi chmod 600 "${VDC_FILES[@]}"
 as_vetvi sha256sum -c - < "$VDC_ASSETS/uiux-release.sha256"
 VDC_PHASE=tests-and-build
 as_vetvi env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm test
-as_vetvi env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/vetvi/ --outDir "$VDC_STAGE/dist"
+as_vetvi env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/space/ --outDir "$VDC_STAGE/dist"
 VDC_PHASE=publish-ui
 # Publish assets before index; keep old hashes valid for already opened pages.
 as_vetvi cmp dist/favicon.svg "$VDC_STAGE/dist/favicon.svg"
 as_vetvi cp -a "$VDC_STAGE/dist/assets/." dist/assets/
 as_vetvi install -m 600 "$VDC_STAGE/dist/index.html" dist/index.next
 as_vetvi mv -- dist/index.next dist/index.html
-curl -fsS --max-time 10 http://92.46.191.252/vetvi/health
+curl -fsS --max-time 10 http://92.46.191.252/space/health
 systemctl is-active vetvi vetvi-tunnel
 VDC_CHANGED=false
 echo "UI установлен без остановки служб. Прежний код и сборка: $VDC_BACKUP/ui.tar.gz"

@@ -68,7 +68,7 @@ async function fixture() {
   await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(socketPath, resolve); });
   return {
     directory, socketPath, keyFile, sessions, seen,
-    config: { socketPath, keyFile, baseUrl: `${origin}/vetvi/` },
+    config: { socketPath, keyFile, baseUrl: `${origin}/space/` },
     setMode(value: string) { mode = value; },
     async close() {
       server.closeAllConnections();
@@ -91,7 +91,7 @@ test("private bridge sessions encrypt handles, survive restart and recheck curre
     assert(!JSON.stringify(result).includes("session"));
     const cookie = output.cookies[0]!;
     assert.equal(cookie.name, "bridge_session");
-    assert.equal(cookie.options.path, "/vetvi");
+    assert.equal(cookie.options.path, "/space");
     assert.equal(cookie.options.httpOnly, true);
     assert.equal(cookie.options.sameSite, "strict");
     assert.equal(cookie.options.secure, false);
@@ -134,7 +134,7 @@ test("bridge logout revokes remotely, expiry and key rotation invalidate local s
     const out = response();
     await bridge.logout(browser(cookie), out.res);
     assert.equal(f.sessions.size, 0);
-    assert.equal(out.cleared[0]!.options.path, "/vetvi");
+    assert.equal(out.cleared[0]!.options.path, "/space");
     assert.equal(await bridge.session(browser(cookie)), undefined);
     cookie = await login();
     service.db.prepare("UPDATE bridge_sessions SET expires_at=?").run(Date.now() - 1);
@@ -193,5 +193,23 @@ test("closed-task conflicts explain the required task action", async () => {
     await assert.rejects(createBridge(f.config, service).call("POST", "/conversations/test/turns", {}),
       (error: unknown) => error instanceof ServiceError && error.status === 409 &&
         error.code === "TASK_INACTIVE" && error.message.includes("верните её в работу"));
+  } finally { service.close(); await f.close(); }
+});
+
+
+test("moving the public prefix requires a fresh scoped session", async () => {
+  const f = await fixture();
+  const service = new TaskService(join(f.directory, "tasks.sqlite"));
+  try {
+    const old = createBridge({ ...f.config, baseUrl: `${origin}/vetvi/` }, service);
+    const login = response();
+    await old.login(browser("", { username: "manager", password: "synthetic-password" }), login.res);
+    const token = `bridge_session=${login.cookies[0]!.value}`;
+    const current = createBridge(f.config, service);
+    assert.equal(await current.session(browser(token)), undefined);
+    const fresh = response();
+    await current.login(browser("", { username: "manager", password: "synthetic-password" }), fresh.res);
+    assert.equal(fresh.cookies[0]!.options.path, "/space");
+    assert.equal((await current.session(browser(`bridge_session=${fresh.cookies[0]!.value}`)))?.actor.id, "human-manager");
   } finally { service.close(); await f.close(); }
 });

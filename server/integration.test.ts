@@ -106,7 +106,7 @@ async function fixture() {
   await new Promise<void>((resolve,reject)=>{server.once("error",reject);server.listen(0,"127.0.0.1",resolve);});
   const address=server.address();assert(address&&typeof address!=="string");
   const origin=`http://127.0.0.1:${address.port}`;
-  const {app,service}=createApp({databasePath:join(directory,"tasks.sqlite"),baseUrl:`${origin}/vetvi/`,owner:"legacy-owner",login:"admin",password:"legacy-password-forbidden",bridge:{socketPath,keyFile,baseUrl:`${origin}/vetvi/`}});
+  const {app,service}=createApp({databasePath:join(directory,"tasks.sqlite"),baseUrl:`${origin}/space/`,owner:"legacy-owner",login:"admin",password:"legacy-password-forbidden",bridge:{socketPath,keyFile,baseUrl:`${origin}/space/`}});
   server.on("request",app);
   async function browser(path:string,method="GET",body?:unknown,cookie="",extra:Record<string,string>={}) {
     return fetch(origin+path,{method,headers:{...(method==="GET"?{}:{Origin:origin}),...(cookie?{Cookie:cookie}:{}),...(body===undefined?{}:{"Content-Type":"application/json"}),...extra},...(body===undefined?{}:{body:JSON.stringify(body)})});
@@ -115,7 +115,7 @@ async function fixture() {
     const response=await browser("/api/login","POST",{username:person.username,password:"synthetic-password",actor:{id:"forged",role:"admin"}});
     assert.equal(response.status,200,await response.clone().text());
     const cookie=response.headers.get("set-cookie")!.split(";")[0]!;
-    assert(response.headers.get("set-cookie")!.includes("Path=/vetvi"));
+    assert(response.headers.get("set-cookie")!.includes("Path=/space"));
     return {cookie,response:await response.json()};
   }
   const tool=(cookie:string,name:string,args:Record<string,unknown>={})=>browser(`/api/tools/${name}`,"POST",args,cookie);

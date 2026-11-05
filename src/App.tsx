@@ -679,7 +679,7 @@ export default function App() {
             });
           }}
         >
-          <h1>space</h1>
+          <h1>Space</h1>
           <label>
             Логин
             <input
@@ -716,11 +716,11 @@ export default function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <a className="brand workspace-brand" href={import.meta.env.BASE_URL} aria-label="space">
+        <a className="brand workspace-brand" href={import.meta.env.BASE_URL} aria-label="Space">
           <div className="brand-icon">
             <GitBranch size={22} />
           </div>
-          <span>space</span>
+          <span>Space</span>
         </a>
         <div className="side-label">ПРОСТРАНСТВО</div>
         <button

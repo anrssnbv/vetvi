@@ -97,7 +97,7 @@ export function installIntegration(app:Express, service:TaskService, config:Brid
   });
   app.post("/api/login",async(req,res)=>res.json(await bridge.login(req,res)));
   app.post("/api/logout",async(req,res)=>{await bridge.logout(req,res);res.json({ok:true});});
-  app.all("/mcp",(_req,res)=>res.status(403).json({code:"INDIVIDUAL_DELEGATION_REQUIRED",message:"Для совместных проектов требуется индивидуальная делегация. Используйте интерфейс space."}));
+  app.all("/mcp",(_req,res)=>res.status(403).json({code:"INDIVIDUAL_DELEGATION_REQUIRED",message:"Для совместных проектов требуется индивидуальная делегация. Используйте интерфейс Space."}));
   app.post("/api/tools/:tool",async(req,res)=>{
     bridge.csrf(req);
     const current=await signed(req),allowed=await grants(current.handle),tool=String(req.params.tool),args=req.body;

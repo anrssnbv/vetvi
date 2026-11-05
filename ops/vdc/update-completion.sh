@@ -66,14 +66,14 @@ as_vetvi chmod 600 "${VDC_FILES[@]}"
 as_vetvi sha256sum -c - < "$VDC_ASSETS/completion-release.sha256"
 VDC_PHASE=tests-and-build
 as_vetvi env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm test
-as_vetvi env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/vetvi/
+as_vetvi env PATH=/opt/node24/bin:/usr/bin:/bin /opt/node24/bin/npm run build -- --base=/space/
 VDC_PHASE=live-verification
 services start
 curl -fsS --retry 10 --retry-connrefused --retry-delay 1 --max-time 5 \
   -H 'Host: 92.46.191.252' http://127.0.0.1:3001/health
 curl -fsS --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 http://127.0.0.1:3002/readyz
 systemctl is-active vetvi vetvi-tunnel
-as_vetvi cat /etc/vetvi/app.env | python3 "$VDC_WORKSPACE/ops/vdc/verify-http.py" http://92.46.191.252/vetvi /dev/stdin
+as_vetvi cat /etc/vetvi/app.env | python3 "$VDC_WORKSPACE/ops/vdc/verify-http.py" http://92.46.191.252/space /dev/stdin
 VDC_CHANGED=false
 echo "Обновление завершено. Прежний код: $VDC_BACKUP/code.tar.gz"
 echo 'Завершение требует только результата. Nginx, платформа, настройки и базы не заменялись.'

@@ -246,7 +246,7 @@ export function createAuth(config: AuthConfig) {
       authorization_servers: issuer ? [config.oauthIssuer] : [],
       scopes_supported: ["tasks:read", "tasks:write"],
       bearer_methods_supported: ["header"],
-      resource_name: "space",
+      resource_name: "Space",
     }),
   };
 }
