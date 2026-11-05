@@ -1404,8 +1404,8 @@ export default function App() {
         }); }}>Подтвердить перенос и общий доступ</button></div>
       </Modal>}
       {memberModal && shared && projectId && <Modal title="Участники проекта" close={() => setMemberModal(false)}>
-        <p>{projects.find(project => project.id === projectId)?.personal ? "Это личный проект: доступ есть только у владельца, добавление участников недоступно. Для совместной работы создайте общий проект без отметки «Личный проект» и перенесите в него задачи." : canManage ? "Введите логин существующего сотрудника, выберите «Добавить в проект» и нажмите «Сохранить состав». Учётные записи создаёт администратор отдельно." : "Управлять составом этого общего проекта могут администратор и создатель проекта."}</p>
-        <ul className="project-members">{members.map((member) => <li key={member.id || member.user_id}><span>{member.display_name}{member.username ? ` · ${member.username}` : ""}<small>{member.active ? "Доступ открыт" : "Доступ отозван"}</small></span>{canManage && member.active && member.username && <button className="quiet" disabled={busy} onClick={() => { setMemberUsername(member.username!); setMemberActive(false); }}>Отозвать доступ</button>}</li>)}</ul>
+        <p>{projects.find(project => project.id === projectId)?.personal ? "Это личный проект: доступ есть только у владельца, добавление участников недоступно. Для совместной работы создайте общий проект без отметки «Личный проект» и перенесите в него задачи." : canManage ? "Введите логин существующего сотрудника, выберите «Добавить в проект» и нажмите «Добавить участника». Учётные записи создаёт администратор отдельно." : "Управлять составом этого общего проекта могут администратор и создатель проекта."}</p>
+
         {canManage && <form onSubmit={(event) => { event.preventDefault(); void run(async () => {
           const body = { username: memberUsername.trim(), active: memberActive };
           const fingerprint = JSON.stringify({ projectId, body, memberVersion });
@@ -1413,12 +1413,13 @@ export default function App() {
           await requestJson(`/projects/${encodeURIComponent(projectId)}/members`, "PUT", body, { "If-Match": `"${memberVersion}"`, "Idempotency-Key": membershipRequest.current.key });
           membershipRequest.current = null;
           const updated = await requestJson<{items: Member[]; row_version: number}>(`/projects/${encodeURIComponent(projectId)}/members`);
-          setMembers(updated.items); setMemberVersion(updated.row_version); setMemberUsername(""); setNotice("Состав проекта обновлён."); await refresh();
+          setMembers(updated.items); setMemberVersion(updated.row_version); setMemberUsername(""); setMemberActive(true); setNotice("Состав проекта обновлён."); await refresh();
         }); }}>
           <label>Логин существующего сотрудника<input autoFocus required autoComplete="off" minLength={3} maxLength={64} value={memberUsername} onChange={(event) => setMemberUsername(event.target.value)} /></label>
           <label>Действие<select value={memberActive ? "add" : "remove"} onChange={(event) => setMemberActive(event.target.value === "add")}><option value="add">Добавить в проект</option><option value="remove">Отозвать доступ</option></select></label>
-          <div className="modal-actions"><button className="primary" disabled={busy || !memberUsername.trim()}>Сохранить состав</button></div>
+          <div className="modal-actions"><button className="primary" disabled={busy || !memberUsername.trim()}>{memberActive ? "Добавить участника" : "Отозвать доступ"}</button></div>
         </form>}
+        <ul className="project-members">{members.map((member) => <li key={member.id || member.user_id}><span>{member.display_name}{member.username ? ` · ${member.username}` : ""}<small>{member.active ? "Доступ открыт" : "Доступ отозван"}</small></span>{canManage && member.active && member.username && <button className="quiet" disabled={busy} onClick={() => { setMemberUsername(member.username!); setMemberActive(false); }}>Отозвать доступ</button>}</li>)}</ul>
       </Modal>}
       {projectModal && (
         <Modal title="Новый проект" close={() => setProjectModal(false)}>
