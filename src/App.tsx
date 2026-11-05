@@ -1404,7 +1404,7 @@ export default function App() {
         }); }}>Подтвердить перенос и общий доступ</button></div>
       </Modal>}
       {memberModal && shared && projectId && <Modal title="Участники проекта" close={() => setMemberModal(false)}>
-        <p>{canManage ? "Вы можете добавлять существующих сотрудников и отзывать их доступ. Учётные записи создаёт администратор отдельно." : "Управлять составом могут администратор и создатель проекта."}</p>
+        <p>{projects.find(project => project.id === projectId)?.personal ? "Это личный проект: доступ есть только у владельца, добавление участников недоступно. Для совместной работы создайте общий проект без отметки «Личный проект» и перенесите в него задачи." : canManage ? "Введите логин существующего сотрудника, выберите «Добавить в проект» и нажмите «Сохранить состав». Учётные записи создаёт администратор отдельно." : "Управлять составом этого общего проекта могут администратор и создатель проекта."}</p>
         <ul className="project-members">{members.map((member) => <li key={member.id || member.user_id}><span>{member.display_name}{member.username ? ` · ${member.username}` : ""}<small>{member.active ? "Доступ открыт" : "Доступ отозван"}</small></span>{canManage && member.active && member.username && <button className="quiet" disabled={busy} onClick={() => { setMemberUsername(member.username!); setMemberActive(false); }}>Отозвать доступ</button>}</li>)}</ul>
         {canManage && <form onSubmit={(event) => { event.preventDefault(); void run(async () => {
           const body = { username: memberUsername.trim(), active: memberActive };
