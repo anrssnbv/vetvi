@@ -487,6 +487,7 @@ export default function App() {
     setView(storageView === "active" && due === "overdue" ? "list" : "graph");
   };
   const project = listedProjects.find((p) => p.id === projectId);
+  const chatProject = projects.find((p) => p.id === selected?.projectId);
   const canDeleteProject = !shared || projectDeleteAccess.id === projectId && projectDeleteAccess.allowed;
   const unfinishedProjectTasks = activeTasks.filter(task => task.projectId === projectToDelete?.id && !["done", "cancelled"].includes(task.status));
   const projectDeletionReady = !!projectToDelete && projectConfirmation === projectToDelete.title &&
@@ -1260,7 +1261,7 @@ export default function App() {
           nextTaskTitle={nextTask?.title}
           onNext={nextTask ? () => { void select(nextTask); } : undefined}
           onDirty={(dirty) => { taskEditing.current = dirty; }}
-          onAgent={() => setAgentOpen(true)}
+          onAgent={() => { if (chatProject) setAgentOpen(true); else setError("Проект задачи недоступен. Обновите страницу."); }}
           onTransfer={shared && projects.some((item) => item.id === selected.projectId && item.personal) ? () => { setTransferOpen(true); setConfirmSharing(false); setTransferTarget((old) => projects.some((item) => item.id === old && item.personal === false) ? old : projects.find((item) => item.personal === false)?.id || ""); } : undefined}
           busy={busy}
           onClose={() => setSelected(null)}
@@ -1361,7 +1362,7 @@ export default function App() {
           {notice}
         </div>
       )}
-      {agentOpen && selected && <ChatWindow onClose={() => setAgentOpen(false)} />}
+      {agentOpen && selected && chatProject && <ChatWindow key={`${chatProject.id}:${selected.id}`} project={chatProject} task={selected} onClose={() => setAgentOpen(false)} />}
       {create && (
         <Modal
           title={create.parentId ? "Новая подзадача" : "Новая задача"}

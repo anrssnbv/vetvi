@@ -1,7 +1,13 @@
 import { useEffect, useRef } from "react";
 import "./chat-window.css";
+import { taskChatUrl } from "./chat-url";
 
-export function ChatWindow({ onClose }: { onClose: () => void }) {
+export function ChatWindow({ project, task, onClose }: {
+  project: { id: string; title: string };
+  task: { id: string; title: string };
+  onClose: () => void;
+}) {
+  const url = taskChatUrl(project, task);
   const dialog = useRef<HTMLDialogElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -21,12 +27,12 @@ export function ChatWindow({ onClose }: { onClose: () => void }) {
     <header className="chat-window-header">
       <div>
         <h2 id="chat-window-title">SK AI Chat</h2>
-        <p>Отдельный чат. Данные задачи автоматически не передаются.</p>
+        <p>{project.title} · {task.title}</p>
       </div>
-      <a href="/chat/" target="_blank" rel="noopener noreferrer">В новой вкладке</a>
+      <a href={url} target="_blank" rel="noopener noreferrer">В новой вкладке</a>
       <button type="button" onClick={onClose} aria-label="Закрыть чат">Закрыть</button>
     </header>
-    <iframe src="/chat/" title="SK AI Chat" onLoad={(event) => {
+    <iframe src={url} title="SK AI Chat" onLoad={(event) => {
       // Keyboard events inside an iframe do not reach the containing dialog.
       event.currentTarget.contentDocument?.addEventListener("keydown", (key) => {
         if (key.key === "Escape") { key.preventDefault(); close.current(); }

@@ -89,4 +89,4 @@ npm audit
 
 ## Independent chat window
 
-The task chat button opens the existing `/chat/` page in a responsive modal, with a separate-tab link. SK AI Chat keeps its own sign-in, private history and attachments. Task data and the old agent conversations are not transferred automatically. The chat host must allow same-origin framing; unrelated origins stay blocked.
+The task chat button opens the existing `/chat/` page in a responsive modal, with a separate-tab link. SK AI Chat keeps its own sign-in, private history and attachments. Project/task IDs and display names are passed using the [chat handoff contract](docs/sk-ai-chat-handoff.md). Descriptions, attachments and old agent conversations are not transferred. The chat host must allow same-origin framing; unrelated origins stay blocked.

@@ -24,3 +24,5 @@
 - В боковом списке новых проектов показывать только задачи без parentId. Подзадачи сохранять в графе, карточке и просроченных; проверять обычный и личный новые проекты.
 
 - Перед исправлением ошибки вложения сверять HTTP-код и состояние задачи. Проверять активную, завершённую и повторно открытую задачу одним файлом; кнопки чата должны учитывать статус, а ответ TASK_INACTIVE объяснять действие пользователя.
+
+- Before implementing a cross-application feature, confirm which side the owner is building in parallel. Agree the URL/API contract and change only the assigned side; distinguish sender verification from receiver creation/history acceptance.
