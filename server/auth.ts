@@ -246,7 +246,7 @@ export function createAuth(config: AuthConfig) {
       authorization_servers: issuer ? [config.oauthIssuer] : [],
       scopes_supported: ["tasks:read", "tasks:write"],
       bearer_methods_supported: ["header"],
-      resource_name: "Ветви — личные задачи",
+      resource_name: "space",
     }),
   };
 }

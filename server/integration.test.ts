@@ -504,3 +504,35 @@ test("metadata-only project events cannot starve a readable project or require t
     await f.close();
   }
 });
+
+
+test("only project management can change executors, including clearing and imports", async () => {
+  const f = await fixture();
+  try {
+    const manager = (await f.login(f.alice)).cookie;
+    const employee = (await f.login(f.bob)).cookie;
+    const task = await (await f.tool(manager, "create_task", {
+      projectId: f.shared.external_id, title: "Shared progress", assigneeId: f.alice.id,
+      collaboratorIds: [f.bob.id], requestId: "executor-create",
+    })).json() as Task;
+    for (const fields of [{assigneeId: null}, {collaboratorIds: []}, {patch: {assigneeId: f.bob.id}}]) {
+      const denied = await f.tool(employee, "update_task", {id: task.id, expectedVersion: 1, requestId: randomUUID(), ...fields});
+      assert.equal(denied.status, 403);
+    }
+    assert.equal((await f.tool(employee, "create_task", {projectId: f.shared.external_id, title: "No self assignment", assigneeId: f.bob.id, requestId: "executor-self"})).status, 403);
+    assert.equal((await f.tool(employee, "import_data", {projectId: f.shared.external_id, data: {tasks: []}, requestId: "executor-import"})).status, 403);
+    const changed = await f.tool(employee, "update_task", {id: task.id, expectedVersion: 1, description: "Visible task progress", requestId: "progress-write"});
+    assert.equal(changed.status, 200);
+    const read = await (await f.tool(manager, "get_task", {id: task.id})).json() as Task;
+    assert.equal(read.description, "Visible task progress");
+    assert.equal(read.assigneeId, f.alice.id);
+    assert.deepEqual(read.collaboratorIds, [f.bob.id]);
+    const child = await (await f.tool(manager, "create_task", {projectId: f.shared.external_id, parentId: task.id, title: "Child", assigneeId: f.bob.id, requestId: "executor-child"})).json() as Task;
+    assert.equal(child.assigneeId, f.bob.id);
+    const cleared = await f.tool(manager, "update_task", {id: child.id, expectedVersion: child.version, patch: {assigneeId: null, collaboratorIds: []}, requestId: "executor-clear"});
+    assert.equal(cleared.status, 200);
+    assert.equal((await cleared.json() as Task).assigneeId, null);
+    f.readOnly.add(`${f.alice.id}:${f.shared.external_id}`);
+    assert.equal((await f.tool(manager, "update_task", {id: task.id, expectedVersion: read.version, assigneeId: f.bob.id, requestId: "executor-revoked"})).status, 403);
+  } finally { await f.close(); }
+});

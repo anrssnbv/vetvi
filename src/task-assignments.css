@@ -1,0 +1,9 @@
+.task-assignments { margin: 16px 0; }
+.task-assignments h3 { margin: 0 0 12px; font-size: 15px; }
+.task-assignments fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.task-assignments select { width: 100%; min-height: 40px; font: inherit; }
+.task-assignments .executor-list { display: grid; gap: 8px; margin-top: 12px; }
+.task-assignments .executor-option { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0; font-weight: 400; }
+.task-assignments .executor-option input { width: 18px; height: 18px; flex-shrink: 0; margin: 0; }
+.task-assignments .executor-option span { overflow-wrap: anywhere; }
+.task-assignments .muted { margin: 10px 0 0; font-size: 12px; }

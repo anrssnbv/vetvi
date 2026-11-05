@@ -1,4 +1,4 @@
-# Ветви
+# space
 
 Для общего HTTP-входа на этом VDC: [адрес `/vetvi/`, API, Nginx и применение](docs/public-http.md). Это явно выбранный владельцем режим HTTP на порту 80; схема через SSH ниже сохраняется для отдельного закрытого запуска.
 
@@ -90,3 +90,9 @@ npm audit
 ## Independent chat window
 
 The task chat button opens the existing `/chat/` page in a responsive modal, with a separate-tab link. SK AI Chat keeps its own sign-in, private history and attachments. Project/task IDs and display names are passed using the [chat handoff contract](docs/sk-ai-chat-handoff.md). Descriptions, attachments and old agent conversations are not transferred. The chat host must allow same-origin framing; unrelated origins stay blocked.
+
+## Task ownership and progress
+
+Tasks and subtasks show one responsible person and a list of co-executors. Assignment changes require both project-management and task-write permissions; ordinary participants can read assignments and update task progress. The progress field retains the existing description and project visibility rules. Bulk imports also require management permissions because they can replace assignments.
+
+The product is named `space`; `/vetvi/`, existing integration identifiers and data locations remain compatible.

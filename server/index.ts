@@ -186,7 +186,7 @@ if (
   };
   const { app, service } = createApp(config);
   const server = app.listen(port, process.env.HOST ?? "127.0.0.1", () =>
-    console.log(`Ветви: ${config.baseUrl}`),
+    console.log(`space: ${config.baseUrl}`),
   );
   const shutdown = () =>
     server.close(() => {

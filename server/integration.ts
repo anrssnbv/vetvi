@@ -97,7 +97,7 @@ export function installIntegration(app:Express, service:TaskService, config:Brid
   });
   app.post("/api/login",async(req,res)=>res.json(await bridge.login(req,res)));
   app.post("/api/logout",async(req,res)=>{await bridge.logout(req,res);res.json({ok:true});});
-  app.all("/mcp",(_req,res)=>res.status(403).json({code:"INDIVIDUAL_DELEGATION_REQUIRED",message:"Для совместных проектов требуется индивидуальная делегация. Используйте интерфейс Ветви."}));
+  app.all("/mcp",(_req,res)=>res.status(403).json({code:"INDIVIDUAL_DELEGATION_REQUIRED",message:"Для совместных проектов требуется индивидуальная делегация. Используйте интерфейс space."}));
   app.post("/api/tools/:tool",async(req,res)=>{
     bridge.csrf(req);
     const current=await signed(req),allowed=await grants(current.handle),tool=String(req.params.tool),args=req.body;
@@ -144,7 +144,11 @@ export function installIntegration(app:Express, service:TaskService, config:Brid
     if(["delete_project","restore_project"].includes(tool) && access.can_edit_project!==true)
       throw new ServiceError("FORBIDDEN","Недостаточно прав для изменения проекта",403);
     const effective=tool==="update_task"?(args.patch??args):args;
-    if(effective.assigneeId || effective.collaboratorIds || tool==="import_data"){
+    // Imports can clear assignments by omission; treat them as assignment administration.
+    const assigns=tool==="import_data" || Object.hasOwn(effective,"assigneeId") || Object.hasOwn(effective,"collaboratorIds");
+    if(assigns && (access.can_write!==true || access.can_edit_project!==true))
+      throw new ServiceError("FORBIDDEN","Назначать исполнителей может администратор или руководитель проекта",403);
+    if(assigns){
       const members=await bridge.call("GET",`/projects/${p.external_id}/members`,undefined,current.handle);
       const ids=new Set(members.items.filter((m:any)=>m.active).map((m:any)=>m.id));
       const assignments=tool==="import_data" && Array.isArray(args.data?.tasks)?args.data.tasks:[effective];

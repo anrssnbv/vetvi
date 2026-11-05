@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newRequestId } from "./request-id";
 import { isOverdue as overdue, localDate as today, sectionProjects, sectionTasks, sidebarGroups, type StorageView } from "./task-view";
 import { ChatWindow } from "./ChatWindow";
+import { TaskAssignments } from "./TaskAssignments";
 import {
   ReactFlow,
   Background,
@@ -678,20 +679,7 @@ export default function App() {
             });
           }}
         >
-          <div className="brand">
-            <div className="brand-icon">
-              <GitBranch size={25} />
-            </div>
-            ветви<span>РАБОЧЕЕ ПРОСТРАНСТВО</span>
-          </div>
-          <h1>
-            Всё начинается
-            <br />с одной задачи.
-          </h1>
-          <p>
-            Ваши идеи, планы и результаты.
-            <br />В одном связанном пространстве.
-          </p>
+          <h1>space</h1>
           <label>
             Логин
             <input
@@ -720,30 +708,19 @@ export default function App() {
             </p>
           )}
           <button className="primary" disabled={busy}>
-            Открыть пространство <ArrowUpRight size={17} />
+            Войти
           </button>
-          <small>Данные хранятся на вашем сервере.</small>
         </form>
-        <div className="login-art">
-          <span>МЕНЬШЕ ХАОСА. БОЛЬШЕ ЯСНОСТИ.</span>
-          <GitBranch size={150} />
-          <h2>
-            Большие планы.
-            <br />
-            Понятные шаги.
-          </h2>
-          <p>Дайте каждой мысли свою ветвь.</p>
-        </div>
       </div>
     );
   return (
     <div className="app">
       <aside className="sidebar">
-        <a className="brand workspace-brand" href={import.meta.env.BASE_URL} aria-label="Пространство задач">
+        <a className="brand workspace-brand" href={import.meta.env.BASE_URL} aria-label="space">
           <div className="brand-icon">
             <GitBranch size={22} />
           </div>
-          <span>Пространство задач</span>
+          <span>space</span>
         </a>
         <div className="side-label">ПРОСТРАНСТВО</div>
         <button
@@ -1257,7 +1234,6 @@ export default function App() {
           task={selected}
           tasks={allProjectTasks}
           shared={shared}
-          members={members}
           nextTaskTitle={nextTask?.title}
           onNext={nextTask ? () => { void select(nextTask); } : undefined}
           onDirty={(dirty) => { taskEditing.current = dirty; }}
@@ -1712,7 +1688,6 @@ function TaskPanel({
   task: t,
   tasks,
   shared,
-  members,
   onAgent,
   onDirty,
   nextTaskTitle,
@@ -1734,7 +1709,6 @@ function TaskPanel({
   task: Task;
   tasks: Task[];
   shared: boolean;
-  members: Member[];
   onAgent: () => void;
   onDirty: (dirty: boolean) => void;
   nextTaskTitle?: string;
@@ -1832,7 +1806,7 @@ function TaskPanel({
                     .split("\n")
                     .map((x) => x.trim())
                     .filter(Boolean),
-                  ...(shared ? { assigneeId: draft.assigneeId ?? null, collaboratorIds: draft.collaboratorIds ?? [] } : {}),
+                  ...(shared && ((draft.assigneeId ?? null) !== (t.assigneeId ?? null) || JSON.stringify(draft.collaboratorIds ?? []) !== JSON.stringify(t.collaboratorIds ?? [])) ? { assigneeId: draft.assigneeId ?? null, collaboratorIds: draft.collaboratorIds ?? [] } : {}),
                   reason: "Редактирование сотрудником в интерфейсе",
                 });
               }}
@@ -1846,7 +1820,7 @@ function TaskPanel({
                 />
               </label>
               <label>
-                Описание
+                Ход задачи
                 <textarea
                   rows={3}
                   value={draft.description || ""}
@@ -1895,10 +1869,7 @@ function TaskPanel({
                   />
                 </label>
               )}
-              {shared && <>
-                <label>Ответственный<select value={draft.assigneeId || ""} onChange={(event) => patch("assigneeId", event.target.value || null)}><option value="">Не назначен</option>{draft.assigneeId && !members.some((member) => (member.id || member.user_id) === draft.assigneeId && member.active) && <option value={draft.assigneeId}>Назначение требует проверки доступа</option>}{members.filter((member) => member.active).map((member) => <option key={member.id || member.user_id} value={member.id || member.user_id}>{member.display_name}</option>)}</select></label>
-                <label>Соисполнители<select multiple value={draft.collaboratorIds ?? []} onChange={(event) => patch("collaboratorIds", Array.from(event.target.selectedOptions, (option) => option.value))}>{(draft.collaboratorIds ?? []).filter((id) => !members.some((member) => (member.id || member.user_id) === id && member.active)).map((id) => <option value={id} key={id}>Назначение требует проверки доступа</option>)}{members.filter((member) => member.active).map((member) => <option key={member.id || member.user_id} value={member.id || member.user_id}>{member.display_name}</option>)}</select></label>
-              </>}
+              {shared && <TaskAssignments projectId={t.projectId} value={{ assigneeId: draft.assigneeId ?? null, collaboratorIds: draft.collaboratorIds ?? [] }} disabled={busy || !!t.deletedAt} load={requestJson} onChange={assignment => setDraft(old => ({ ...old, ...assignment }))} />}
               <label>
                 Срок без времени
                 <input
