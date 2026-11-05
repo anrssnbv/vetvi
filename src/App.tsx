@@ -817,10 +817,6 @@ export default function App() {
           {!listedProjects.length && <p className="muted">{storageView === "archive" ? "В архиве нет задач" : storageView === "trash" ? "Корзина пуста" : due === "overdue" ? "Нет просроченных задач" : "Создайте первый проект"}</p>}
         </div>
         <div className="sidebar-bottom">
-          <div className="local-note">
-            <span className="live-dot" />
-            Локальное хранилище<small>Ваши данные под вашим контролем</small>
-          </div>
           <button
             className={`nav ${storageView === "archive" ? "active" : ""}`}
             onClick={() => openSection("archive")}
