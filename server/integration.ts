@@ -188,6 +188,11 @@ export function installIntegration(app:Express, service:TaskService, config:Brid
     const current=await signed(req);
     res.json(await bridge.call("GET",`/projects/${encodeURIComponent(String(req.params.id))}/members`,undefined,current.handle));
   });
+  app.get("/api/projects/:id/member-candidates",async(req,res)=>{
+    const current=await signed(req);
+    const query=new URLSearchParams({offset:String(req.query.offset??0),limit:"100"});
+    res.json(await bridge.call("GET",`/projects/${encodeURIComponent(String(req.params.id))}/member-candidates?${query}`,undefined,current.handle));
+  });
   app.put("/api/projects/:id/members",async(req,res)=>{
     bridge.csrf(req);const current=await signed(req);
     res.json(await bridge.call("PUT",`/projects/${encodeURIComponent(String(req.params.id))}/members`,req.body,current.handle,{"If-Match":String(req.headers["if-match"]??""),"Idempotency-Key":String(req.headers["idempotency-key"]??"")}));

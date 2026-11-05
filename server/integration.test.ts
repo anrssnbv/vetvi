@@ -78,11 +78,15 @@ async function fixture() {
         if(loseProjectResponse){loseProjectResponse=false;req.socket.destroy();return;}
         return send(200,{item:p});
       }
-      const projectRoute=/^\/projects\/([^/]+)\/(access|members|sources)$/.exec(path);
+      const projectRoute=/^\/projects\/([^/]+)\/(access|members|member-candidates|sources)$/.exec(path);
       if(projectRoute) {
         const p=projects.get(projectRoute[1]!);
         if(!p||!person.grants.has(p.external_id)||(p.personal&&p.creator_id!==person.id))return send(404,{});
         if(projectRoute[2]==="access")return send(200,{can_read:!readDenied.has(`${person.id}:${p.external_id}`),can_write:!readOnly.has(`${person.id}:${p.external_id}`),can_edit_project:p.creator_id===person.id,can_manage:p.creator_id===person.id&&!p.personal,can_review:false});
+        if(projectRoute[2]==="member-candidates") {
+          if(p.personal||p.creator_id!==person.id)return send(403,{});
+          return send(200,{items:people.filter(candidate=>candidate.active).map(candidate=>({id:candidate.id,username:candidate.username,display_name:candidate.username})),next_offset:null});
+        }
         if(projectRoute[2]==="members")return send(200,{project:p,items:people.filter(candidate=>candidate.grants.has(p.external_id)).map(candidate=>({id:candidate.id,display_name:candidate.username,active:candidate.active}))});
         return send(200,{items:[]});
       }
@@ -535,4 +539,19 @@ test("only project management can change executors, including clearing and impor
     f.readOnly.add(`${f.alice.id}:${f.shared.external_id}`);
     assert.equal((await f.tool(manager, "update_task", {id: task.id, expectedVersion: read.version, assigneeId: f.bob.id, requestId: "executor-revoked"})).status, 403);
   } finally { await f.close(); }
+});
+
+
+test("member directory uses the current project-management boundary",async()=>{
+  const f=await fixture();
+  try {
+    const manager=(await f.login(f.alice)).cookie,employee=(await f.login(f.bob)).cookie;
+    const path=`/api/projects/${f.shared.external_id}/member-candidates`;
+    assert.equal((await f.browser(path)).status,401);
+    const result=await f.browser(path,"GET",undefined,manager);
+    assert.equal(result.status,200);
+    const body=await result.json();
+    assert(body.items.some((person:any)=>person.username===f.bob.username));
+    assert.equal((await f.browser(path,"GET",undefined,employee)).status,403);
+  } finally {await f.close();}
 });

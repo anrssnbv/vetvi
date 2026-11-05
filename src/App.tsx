@@ -245,6 +245,9 @@ export default function App() {
   const projectDeleteRequest = useRef("");
   const [memberModal, setMemberModal] = useState(false), [memberUsername, setMemberUsername] = useState(""), [memberActive, setMemberActive] = useState(true);
   const [personalProject, setPersonalProject] = useState(false);
+  const [memberCandidates, setMemberCandidates] = useState<{id: string; username: string; display_name: string}[]>([]);
+  const [candidateError, setCandidateError] = useState("");
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
   const membershipRequest = useRef<{ body: string; key: string } | null>(null);
   const [transferOpen, setTransferOpen] = useState(false), [transferTarget, setTransferTarget] = useState(""), [confirmSharing, setConfirmSharing] = useState(false);
   const transferRequest = useRef<{ body: string; key: string } | null>(null);
@@ -260,6 +263,25 @@ export default function App() {
     [tasks, setTasks] = useState<Task[]>([]),
     [activeTasks, setActiveTasks] = useState<Task[]>([]),
     [selected, setSelected] = useState<Task | null>(null);
+  useEffect(() => {
+    let active = true;
+    setMemberCandidates([]); setCandidateError(""); setMemberUsername(""); setMemberActive(true);
+    if (!memberModal || !canManage || !projectId) return;
+    setCandidatesLoading(true);
+    void (async () => {
+      const items: {id: string; username: string; display_name: string}[] = [];
+      let offset: number | null = 0;
+      while (offset !== null) {
+        const page: {items: typeof items; next_offset: number | null} = await requestJson(`/projects/${encodeURIComponent(projectId)}/member-candidates?offset=${offset}`);
+        if (!active) return;
+        items.push(...page.items); offset = page.next_offset;
+      }
+      if (active) setMemberCandidates(items);
+    })().catch((failure: unknown) => {
+      if (active) setCandidateError(failure instanceof Error ? failure.message : "Не удалось загрузить сотрудников.");
+    }).finally(() => { if (active) setCandidatesLoading(false); });
+    return () => { active = false; };
+  }, [memberModal, canManage, projectId]);
   const [view, setView] = useState("graph"),
     [query, setQuery] = useState(""),
     [status, setStatus] = useState(""),
@@ -1404,7 +1426,7 @@ export default function App() {
         }); }}>Подтвердить перенос и общий доступ</button></div>
       </Modal>}
       {memberModal && shared && projectId && <Modal title="Участники проекта" close={() => setMemberModal(false)}>
-        <p>{projects.find(project => project.id === projectId)?.personal ? "Это личный проект: доступ есть только у владельца, добавление участников недоступно. Для совместной работы создайте общий проект без отметки «Личный проект» и перенесите в него задачи." : canManage ? "Введите логин существующего сотрудника, выберите «Добавить в проект» и нажмите «Добавить участника». Учётные записи создаёт администратор отдельно." : "Управлять составом этого общего проекта могут администратор и создатель проекта."}</p>
+        <p>{projects.find(project => project.id === projectId)?.personal ? "Это личный проект: доступ есть только у владельца, добавление участников недоступно. Для совместной работы создайте общий проект без отметки «Личный проект» и перенесите в него задачи." : canManage ? "Выберите сотрудника по имени, выберите «Добавить в проект» и нажмите «Добавить участника». Учётные записи создаёт администратор отдельно." : "Управлять составом этого общего проекта могут администратор и создатель проекта."}</p>
 
         {canManage && <form onSubmit={(event) => { event.preventDefault(); void run(async () => {
           const body = { username: memberUsername.trim(), active: memberActive };
@@ -1415,8 +1437,12 @@ export default function App() {
           const updated = await requestJson<{items: Member[]; row_version: number}>(`/projects/${encodeURIComponent(projectId)}/members`);
           setMembers(updated.items); setMemberVersion(updated.row_version); setMemberUsername(""); setMemberActive(true); setNotice("Состав проекта обновлён."); await refresh();
         }); }}>
-          <label>Логин существующего сотрудника<input autoFocus required autoComplete="off" minLength={3} maxLength={64} value={memberUsername} onChange={(event) => setMemberUsername(event.target.value)} /></label>
-          <label>Действие<select value={memberActive ? "add" : "remove"} onChange={(event) => setMemberActive(event.target.value === "add")}><option value="add">Добавить в проект</option><option value="remove">Отозвать доступ</option></select></label>
+          {candidateError && <p role="alert">{candidateError}</p>}
+          <label>Сотрудник<select autoFocus required disabled={busy || candidatesLoading || !!candidateError} value={memberUsername} onChange={event => setMemberUsername(event.target.value)}>
+            <option value="">{candidatesLoading ? "Загрузка сотрудников…" : "Выберите сотрудника"}</option>
+            {memberActive ? memberCandidates.filter(candidate => !members.some(member => member.active && (member.id === candidate.id || member.username === candidate.username))).map(candidate => <option key={candidate.id} value={candidate.username}>{candidate.display_name || candidate.username}</option>) : members.filter(member => member.active && member.username).map(member => <option key={member.id || member.user_id} value={member.username}>{member.display_name}</option>)}
+          </select></label>
+          <label>Действие<select value={memberActive ? "add" : "remove"} onChange={(event) => { setMemberActive(event.target.value === "add"); setMemberUsername(""); }}><option value="add">Добавить в проект</option><option value="remove">Отозвать доступ</option></select></label>
           <div className="modal-actions"><button className="primary" disabled={busy || !memberUsername.trim()}>{memberActive ? "Добавить участника" : "Отозвать доступ"}</button></div>
         </form>}
         <ul className="project-members">{members.map((member) => <li key={member.id || member.user_id}><span>{member.display_name}{member.username ? ` · ${member.username}` : ""}<small>{member.active ? "Доступ открыт" : "Доступ отозван"}</small></span>{canManage && member.active && member.username && <button className="quiet" disabled={busy} onClick={() => { setMemberUsername(member.username!); setMemberActive(false); }}>Отозвать доступ</button>}</li>)}</ul>
