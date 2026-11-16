@@ -427,6 +427,72 @@ export class TaskService {
         }
     return found;
   }
+  // A task waits for its descendants (open children block completion) and for its
+  // dependency targets, transitively. New hierarchy or dependency edges are rejected
+  // when they would close such a wait cycle and deadlock both completions.
+  private waitsFor(
+    owner: string,
+    start: string,
+    dependencies: { source: string; target: string }[],
+  ) {
+    const children = new Map<string, string[]>(),
+      targets = new Map<string, string[]>();
+    for (const task of this.rows<Task>(owner, "task"))
+      if (task.parentId)
+        children.set(task.parentId, [...(children.get(task.parentId) ?? []), task.id]);
+    for (const link of dependencies)
+      targets.set(link.source, [...(targets.get(link.source) ?? []), link.target]);
+    const edges = (id: string) => [
+        ...(children.get(id) ?? []),
+        ...(targets.get(id) ?? []),
+      ],
+      seen = new Set(edges(start)),
+      queue = [...seen];
+    for (let i = 0; i < queue.length; i++)
+      for (const id of edges(queue[i]!))
+        if (!seen.has(id)) {
+          seen.add(id);
+          queue.push(id);
+        }
+    return seen;
+  }
+  private inArchivedBranch(owner: string, id: string) {
+    return this.archivedBranches(this.rows<Task>(owner, "task")).has(id);
+  }
+  // Open work blocks its ancestors and its dependents again, so their completion is invalidated.
+  private invalidateCompletion(
+    owner: string,
+    actor: Actor,
+    startId: string,
+    args: Args,
+  ) {
+    const queue = [startId],
+      affected = new Set([startId]),
+      all = this.rows<Task>(owner, "task"),
+      links = this.links(owner, "dependency");
+    while (queue.length) {
+      const id = queue.shift()!;
+      const current = all.find((t) => t.id === id);
+      const candidates = [
+        ...(current?.parentId ? [current.parentId] : []),
+        ...links.filter((l) => l.target === id).map((l) => l.source),
+      ];
+      for (const candidate of candidates) {
+        if (affected.has(candidate)) continue;
+        affected.add(candidate);
+        queue.push(candidate);
+        const task = all.find((t) => t.id === candidate);
+        if (task?.status === "done")
+          this.save(
+            actor,
+            "completion_invalidated",
+            task,
+            { ...task, status: "review" },
+            args,
+          );
+      }
+    }
+  }
   private log(
     actor: Actor,
     tool: string,
@@ -494,13 +560,17 @@ export class TaskService {
     return this.detail(this.namespace(actor), next);
   }
   private archivedBranches(tasks: Task[]) {
+    const children = new Map<string, string[]>();
+    for (const task of tasks)
+      if (task.parentId)
+        children.set(task.parentId, [...(children.get(task.parentId) ?? []), task.id]);
     const ids = new Set(tasks.filter(task => task.archivedAt).map(task => task.id));
     const queue = [...ids];
     for (let i = 0; i < queue.length; i++) {
-      for (const task of tasks) {
-        if (task.parentId === queue[i] && !ids.has(task.id)) {
-          ids.add(task.id);
-          queue.push(task.id);
+      for (const child of children.get(queue[i]) ?? []) {
+        if (!ids.has(child)) {
+          ids.add(child);
+          queue.push(child);
         }
       }
     }
@@ -508,8 +578,10 @@ export class TaskService {
   }
   private detail(owner: string, task: Task) {
     const tasks = this.rows<Task>(owner, "task");
+    // An archived branch stays out of active work, so it must not block completion either.
+    const archived = this.archivedBranches(tasks);
     const active = (t: Task) =>
-      !t.deletedAt && !t.archivedAt && t.status !== "cancelled";
+      !t.deletedAt && !archived.has(t.id) && t.status !== "cancelled";
     const leaves: Task[] = [];
     const queue = [task];
     while (queue.length) {
@@ -521,7 +593,7 @@ export class TaskService {
     }
     const done = leaves.filter((t) => t.status === "done").length;
     const childIds = new Set(this.descendants(owner, task.id).slice(1));
-    const openChildren = tasks.some((t) => childIds.has(t.id) && !t.deletedAt && !["done", "cancelled"].includes(t.status));
+    const openChildren = tasks.some((t) => childIds.has(t.id) && !t.deletedAt && !archived.has(t.id) && !["done", "cancelled"].includes(t.status));
     const openDependencies = this.links(owner, "dependency").filter((link) => link.source === task.id)
       .some((link) => { const dependency = this.get<Task>(owner, link.target); return dependency.status !== "done" || !!dependency.deletedAt; });
     const dependencies = this.links(owner, "dependency")
@@ -904,6 +976,12 @@ export class TaskService {
       const parent = args.parentId
         ? this.get<Task>(owner, args.parentId)
         : null;
+      if (parent && this.inArchivedBranch(owner, parent.id))
+        fail(
+          "ARCHIVED_PARENT",
+          "Родитель находится в архивной ветке. Сначала восстановите ветку",
+          409,
+        );
       if (
         parent &&
         (parent.projectId !== args.projectId ||
@@ -1008,6 +1086,12 @@ export class TaskService {
       const parent = args.parentId
         ? this.get<Task>(owner, args.parentId)
         : null;
+      if (parent && this.inArchivedBranch(owner, parent.id))
+        fail(
+          "ARCHIVED_PARENT",
+          "Родитель находится в архивной ветке. Сначала восстановите ветку",
+          409,
+        );
       if (
         parent &&
         (ids.includes(parent.id) ||
@@ -1016,6 +1100,16 @@ export class TaskService {
           ["done", "cancelled"].includes(parent.status))
       )
         fail("TREE_CYCLE", "Недопустимый родитель или цикл дерева");
+      if (
+        parent &&
+        this.waitsFor(owner, next.id, this.links(owner, "dependency")).has(
+          parent.id,
+        )
+      )
+        fail(
+          "TREE_CYCLE",
+          "Перенос создаёт взаимную блокировку с зависимостями",
+        );
       const projectId = String(
         args.projectId ?? parent?.projectId ?? next.projectId,
       );
@@ -1064,19 +1158,12 @@ export class TaskService {
       if (adding && kind === "dependency") {
         if (next.status === "done")
           fail("INVALID_TRANSITION", "Сначала откройте задачу повторно");
-        const links = this.links(owner, kind),
-          seen = new Set<string>(),
-          queue = [target.id];
-        while (queue.length) {
-          const id = queue.shift()!;
-          if (id === next.id)
-            fail("DEPENDENCY_CYCLE", "Зависимость создаёт цикл");
-          if (seen.has(id)) continue;
-          seen.add(id);
-          queue.push(
-            ...links.filter((l) => l.source === id).map((l) => l.target),
+        const links = this.links(owner, kind);
+        if (this.waitsFor(owner, target.id, links).has(next.id))
+          fail(
+            "DEPENDENCY_CYCLE",
+            "Зависимость создаёт цикл с учётом иерархии задач",
           );
-        }
       }
       if (kind === "related") {
         const [sourceId, targetId] = [next.id, target.id].sort();
@@ -1121,8 +1208,10 @@ export class TaskService {
           createdAt: now,
         });
       const descendantIds = new Set(this.descendants(owner, next.id).slice(1));
-      const children = this.rows<Task>(owner, "task").filter(
-        (t) => descendantIds.has(t.id) && !t.deletedAt,
+      const allTasks = this.rows<Task>(owner, "task");
+      const archived = this.archivedBranches(allTasks);
+      const children = allTasks.filter(
+        (t) => descendantIds.has(t.id) && !t.deletedAt && !archived.has(t.id),
       );
       if (children.some((t) => !["done", "cancelled"].includes(t.status)))
         fail("OPEN_CHILDREN", "Остались открытые подзадачи", 409);
@@ -1138,33 +1227,7 @@ export class TaskService {
         fail("INVALID_TRANSITION", "Задача не закрыта");
       next.status = "planned";
       next.result = "";
-      // Reopening invalidates completion of dependent and ancestor tasks.
-      const queue = [next.id],
-        affected = new Set([next.id]),
-        all = this.rows<Task>(owner, "task"),
-        links = this.links(owner, "dependency");
-      while (queue.length) {
-        const id = queue.shift()!;
-        const current = all.find((t) => t.id === id);
-        const candidates = [
-          ...(current?.parentId ? [current.parentId] : []),
-          ...links.filter((l) => l.target === id).map((l) => l.source),
-        ];
-        for (const candidate of candidates) {
-          if (affected.has(candidate)) continue;
-          affected.add(candidate);
-          queue.push(candidate);
-          const task = all.find((t) => t.id === candidate);
-          if (task?.status === "done")
-            this.save(
-              actor,
-              "completion_invalidated",
-              task,
-              { ...task, status: "review" },
-              args,
-            );
-        }
-      }
+      this.invalidateCompletion(owner, actor, next.id, args);
     } else if (tool === "archive_task") {
       next.archivedAt = args.archived === false ? null : now;
     } else if (tool === "set_position") {
@@ -1190,10 +1253,12 @@ export class TaskService {
     } else if (tool === "delete_task") {
       const ids = this.descendants(owner, next.id).sort();
       const preview = args.previewIds;
+      // subtree:false deletes the task alone and is refused while it still has descendants.
+      const expected = args.subtree === true ? ids : [next.id];
       if (
-        args.subtree !== true ||
+        (args.subtree !== true && ids.length > 1) ||
         !Array.isArray(preview) ||
-        JSON.stringify([...preview].sort()) !== JSON.stringify(ids)
+        JSON.stringify([...preview].sort()) !== JSON.stringify(expected)
       )
         fail(
           "DELETE_CONFIRMATION",
@@ -1215,6 +1280,10 @@ export class TaskService {
           );
       }
     } else if (tool === "restore_task") {
+      const batch = next.deletionBatch;
+      const restored = this.rows<Task>(owner, "task").filter(
+        (t) => t.id === next.id || (batch !== null && t.deletionBatch === batch),
+      );
       if (next.deletedAt) {
         if (next.parentId && this.get<Task>(owner, next.parentId).deletedAt)
           fail(
@@ -1223,7 +1292,7 @@ export class TaskService {
             409,
           );
         for (const child of this.rows<Task>(owner, "task").filter(
-          (t) => t.id !== next.id && t.deletionBatch === next.deletionBatch,
+          (t) => t.id !== next.id && t.deletionBatch === batch,
         ))
           this.save(
             actor,
@@ -1253,6 +1322,9 @@ export class TaskService {
           args.reason ?? "Восстановлена задача проекта",
         );
       }
+      // Restored open work blocks its ancestors and dependents again, exactly like reopen_task.
+      if (restored.some((t) => !["done", "cancelled"].includes(t.status)))
+        this.invalidateCompletion(owner, actor, next.id, args);
     }
     this.validateTask(next);
     return this.save(actor, tool, before, next, args);
@@ -1387,6 +1459,7 @@ export class TaskService {
         }
       }
     }
+    const archivedBranchIds = this.archivedBranches(tasks);
     for (const task of tasks.filter((t) => t.status === "done")) {
       const descendants = new Set<string>(),
         queue = [task.id];
@@ -1401,6 +1474,7 @@ export class TaskService {
           (t) =>
             descendants.has(t.id) &&
             !t.deletedAt &&
+            !archivedBranchIds.has(t.id) &&
             !["done", "cancelled"].includes(t.status),
         ) ||
         links.some(

@@ -93,7 +93,7 @@ def verify(base, env_path):
     status, headers, _ = call(prefix)
     assert status == 308 and headers["Location"] == prefix + "/", "prefix redirect"
     status, headers, html = call(prefix + "/")
-    assert status == 200 and "Ветви" in html.decode(), "Vetvi page"
+    assert status == 200 and "<title>Space</title>" in html.decode(), "Space page"
     policies = headers.get_all("Content-Security-Policy") or []
     assert len(policies) == 1 and "form-action 'self'" in policies[0], "application CSP"
     assets = re.findall(r'(?:src|href)="([^"]+)"', html.decode())
