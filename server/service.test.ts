@@ -1138,3 +1138,179 @@ test("legacy project sharing never shares its private category title or category
     assert.equal(JSON.parse(service.db.prepare("SELECT data FROM records WHERE id=?").get(category.id)!.data as string).title,"Private category metadata");
   }finally{service.close();}
 });
+
+test("archived branch stays out of progress and does not block parent completion", () => {
+  const { s, create, write } = fixture();
+  try {
+    let root = create("Регламент взаимодействия");
+    const visible = create("Видимая подзадача", { parentId: root.id });
+    const archived = create("Архивная ветка", { parentId: root.id });
+    const hidden = create("Незавершённый потомок", { parentId: archived.id });
+    write("complete_task", visible, { result: "Подзадача выполнена" });
+    write("archive_task", archived);
+    const detail = s.execute("get_task", { id: root.id }, owner) as Task & {
+      openChildren: boolean;
+      progress: { total: number; percent: number };
+    };
+    assert.equal(detail.progress.total, 1);
+    assert.equal(detail.progress.percent, 100);
+    assert.equal(detail.openChildren, false);
+    assert.equal(
+      (s.execute("search_tasks", {}, owner) as { total: number }).total,
+      2,
+    );
+    root = write("complete_task", root, { result: "Регламент согласован" });
+    assert.equal(root.status, "done");
+    assert.equal(
+      (s.execute("get_task", { id: hidden.id }, owner) as Task).status,
+      "planned",
+    );
+    const copy = new TaskService(":memory:");
+    try {
+      copy.execute(
+        "import_data",
+        { requestId: "import-archived-branch", data: s.execute("export_data", {}, owner) },
+        owner,
+      );
+      assert.equal(
+        (copy.execute("get_task", { id: root.id }, owner) as Task).status,
+        "done",
+      );
+    } finally {
+      copy.close();
+    }
+  } finally {
+    s.close();
+  }
+});
+
+test("open work cannot be created or moved inside an archived branch", () => {
+  const { s, create, write } = fixture();
+  try {
+    const branch = create("Архивная ветка");
+    const inner = create("Потомок ветки", { parentId: branch.id });
+    const archivedBranch = write("archive_task", branch);
+    assert.throws(
+      () => create("Новая задача", { parentId: inner.id }),
+      code("ARCHIVED_PARENT"),
+    );
+    const moved = create("Переносимая задача");
+    assert.throws(
+      () => write("move_task", moved, { parentId: inner.id }),
+      code("ARCHIVED_PARENT"),
+    );
+    assert.equal(
+      (s.execute("get_task", { id: moved.id }, owner) as Task).parentId,
+      null,
+    );
+    const restored = write("restore_task", archivedBranch);
+    const created = create("Новая задача", { parentId: inner.id });
+    assert.equal(created.parentId, inner.id);
+    assert.equal(restored.archivedAt, null);
+  } finally {
+    s.close();
+  }
+});
+
+test("restoring open work returns completed ancestors and dependents to review", () => {
+  const { s, create, write } = fixture();
+  try {
+    let parent = create("Родитель"),
+      child = create("Подзадача", { parentId: parent.id });
+    child = write("delete_task", child, { subtree: false, previewIds: [child.id] });
+    parent = write("complete_task", parent, { result: "Работа принята" });
+    assert.equal(parent.status, "done");
+    child = write("restore_task", child);
+    assert.equal(child.status, "planned");
+    const after = s.execute("get_task", { id: parent.id }, owner) as Task & {
+      openChildren: boolean;
+      progress: { percent: number };
+    };
+    assert.equal(after.status, "review");
+    assert.equal(after.openChildren, true);
+    assert.equal(after.progress.percent, 0);
+
+    let other = create("Второй родитель"),
+      archived = create("Архивный потомок", { parentId: other.id });
+    archived = write("archive_task", archived);
+    other = write("complete_task", other, { result: "Согласовано" });
+    assert.equal(other.status, "done");
+    archived = write("restore_task", archived);
+    assert.equal(archived.archivedAt, null);
+    assert.equal(
+      (s.execute("get_task", { id: other.id }, owner) as Task).status,
+      "review",
+    );
+  } finally {
+    s.close();
+  }
+});
+
+test("hierarchy and dependencies cannot deadlock each other", () => {
+  const { s, create, write } = fixture();
+  try {
+    const parent = create("Родитель");
+    const child = create("Подзадача", { parentId: parent.id });
+    assert.throws(
+      () => write("add_dependency", child, { targetId: parent.id }),
+      code("DEPENDENCY_CYCLE"),
+    );
+    const x = create("X"),
+      z = create("Z");
+    let y = create("Y");
+    y = write("add_dependency", y, { targetId: x.id });
+    assert.throws(
+      () => write("move_task", y, { parentId: x.id }),
+      code("TREE_CYCLE"),
+    );
+    y = write("move_task", y, { parentId: z.id });
+    assert.equal(y.parentId, z.id);
+    assert.equal(
+      (s.execute("get_task", { id: x.id }, owner) as Task).parentId,
+      null,
+    );
+  } finally {
+    s.close();
+  }
+});
+
+test("single task deletion follows the documented subtree contract", () => {
+  const { s, create, write } = fixture();
+  try {
+    const leaf = create("Одиночная задача");
+    const preview = s.execute("preview_delete", { id: leaf.id }, owner) as {
+      ids: string[];
+    };
+    assert.deepEqual(preview.ids, [leaf.id]);
+    assert.throws(
+      () => write("delete_task", leaf, { subtree: false, previewIds: [] }),
+      code("DELETE_CONFIRMATION"),
+    );
+    const deleted = write("delete_task", leaf, {
+      subtree: false,
+      previewIds: preview.ids,
+    });
+    assert.ok(deleted.deletedAt);
+
+    const branch = create("Ветка"),
+      descendant = create("Потомок", { parentId: branch.id });
+    const full = s.execute("preview_delete", { id: branch.id }, owner) as {
+      ids: string[];
+    };
+    assert.equal(full.ids.length, 2);
+    assert.throws(
+      () => write("delete_task", branch, { subtree: false, previewIds: full.ids }),
+      code("DELETE_CONFIRMATION"),
+    );
+    assert.throws(
+      () => write("delete_task", branch, { subtree: true, previewIds: [branch.id] }),
+      code("DELETE_CONFIRMATION"),
+    );
+    write("delete_task", branch, { subtree: true, previewIds: full.ids });
+    assert.ok(
+      (s.execute("get_task", { id: descendant.id }, owner) as Task).deletedAt,
+    );
+  } finally {
+    s.close();
+  }
+});

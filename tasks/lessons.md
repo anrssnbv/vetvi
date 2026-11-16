@@ -27,3 +27,9 @@
 
 - Before implementing a cross-application feature, confirm which side the owner is building in parallel. Agree the URL/API contract and change only the assigned side; distinguish sender verification from receiver creation/history acceptance.
 - Use the owner's exact product capitalization (Space). A requested public-prefix rename includes build base, API callers, cookie scope, proxy deny rules and deployment recipes; preserve private protocol identifiers unless separately requested.
+
+- Не подменять коды ошибок на транспортном слое: прокси личного MCP сводил любой 4xx к коду по статусу с общим текстом, и архивная ветка, цикл и устаревшая версия выглядели одинаково. Передавать `code` и `message`, которые приложение уже решило раскрыть этому пользователю, а обобщать только неразобранное тело и серверные ошибки; отдельно проверять, что обобщённый текст не содержит ответа апстрима.
+
+- Перед использованием унаследованного скрипта проверки сверять его с фактическим режимом развёртывания: `verify-http.py` описывает отдельный HTTP-режим с OAuth и owner-сессией, а рабочий экземпляр работает в режиме делегации SK AI, где `/mcp` всегда отвечает `INDIVIDUAL_DELEGATION_REQUIRED`, а вход проверяет платформа и `OWNER_LOGIN`/`OWNER_PASSWORD` из `app.env` не аутентифицируют. Ворота развёртывания должны проверять анонимную поверхность своего режима и не падать из-за чужого.
+
+- Держать одну архивную ветку для всех правил: прогресс, `openChildren`, завершение, поиск, удаление проекта и импорт должны считать архивный набор одинаково, иначе 100% прогресса конфликтует с `OPEN_CHILDREN`. При добавлении новой проверки «открытых» задач явно указывать, исключает ли она архив и удаление.

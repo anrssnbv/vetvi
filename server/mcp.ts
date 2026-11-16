@@ -119,7 +119,7 @@ export const definitions = {
   },
   create_task: {
     description:
-      "Create an owned task in a project; completion needs a separate operation with a result.",
+      "Create an owned task in a project; completion needs a separate operation with a result. An archived branch must be restored before work is added under it.",
     schema: {
       ...mutation,
       ...editable,
@@ -137,7 +137,7 @@ export const definitions = {
   },
   move_task: {
     description:
-      "Move a whole branch without losing children/history. Tree cycles and invalid parent/project combinations are rejected.",
+      "Move a whole branch without losing children/history. Tree cycles, hierarchy/dependency deadlocks, archived parents and invalid parent/project combinations are rejected.",
     schema: {
       ...existing,
       parentId: id.nullable(),
@@ -148,7 +148,7 @@ export const definitions = {
   },
   add_dependency: {
     description:
-      "Require target task before this task can complete. Dependency cycles are rejected.",
+      "Require target task before this task can complete. Cycles are rejected for dependencies and task hierarchy together, because either one blocks completion.",
     schema: { ...existing, targetId: id },
     read: false,
   },
@@ -165,7 +165,7 @@ export const definitions = {
   },
   complete_task: {
     description:
-      "Complete with a specific nonempty result. Criteria and evidence links are optional. Do not claim external approval merely because a document was generated; if ambiguous, set review instead. Rejects open descendants/dependencies.",
+      "Complete with a specific nonempty result. Criteria and evidence links are optional. Do not claim external approval merely because a document was generated; if ambiguous, set review instead. Rejects open descendants/dependencies; tasks in an archived branch count as excluded from active work, like progress and search.",
     schema: {
       ...existing,
       result: z.string().min(1).max(20000),
@@ -187,7 +187,8 @@ export const definitions = {
     read: false,
   },
   restore_task: {
-    description: "Restore the deleted batch or unarchive an owned task.",
+    description:
+      "Restore the deleted batch or unarchive an owned task. Restored open work returns its completed ancestors and dependents to review.",
     schema: existing,
     read: false,
   },
@@ -237,7 +238,7 @@ export const definitions = {
   },
   delete_task: {
     description:
-      "Recoverably delete a task. A subtree requires explicit selection and the exact previewed ID list.",
+      "Recoverably delete a task. subtree:false deletes the task alone and is rejected while it still has descendants; subtree:true requires the exact previewed ID list.",
     schema: { ...existing, subtree: z.boolean(), previewIds: z.array(id) },
     read: false,
   },
